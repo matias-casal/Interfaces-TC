@@ -19,11 +19,7 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
 const transports: winston.transport[] = [
   // Console transport
   new winston.transports.Console({
-    format: combine(
-      colorize(),
-      timestamp({ format: 'HH:mm:ss' }),
-      logFormat
-    ),
+    format: combine(colorize(), timestamp({ format: 'HH:mm:ss' }), logFormat),
   }),
 ];
 
@@ -38,11 +34,7 @@ if (process.env.NODE_ENV === 'production') {
       maxSize: '20m',
       maxFiles: '14d',
       level: 'error',
-      format: combine(
-        timestamp(),
-        errors({ stack: true }),
-        logFormat
-      ),
+      format: combine(timestamp(), errors({ stack: true }), logFormat),
     })
   );
 
@@ -54,10 +46,7 @@ if (process.env.NODE_ENV === 'production') {
       zippedArchive: true,
       maxSize: '20m',
       maxFiles: '14d',
-      format: combine(
-        timestamp(),
-        logFormat
-      ),
+      format: combine(timestamp(), logFormat),
     })
   );
 }

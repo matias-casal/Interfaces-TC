@@ -1,106 +1,102 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit, { RateLimitRequestHandler, Options } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
-
-import { redisClient } from '../config/redis';
+import { createClient } from 'redis';
+import { logger } from '../utils/logger';
 
 /**
- * Create a rate limiter with Redis store
+ * Create Redis client for rate limiting
+ * Uses Redis v4 without legacy mode
  */
-export const createRateLimiter = (options: Partial<Options> = {}): RateLimitRequestHandler => {
-  // Disable rate limiting in development if DISABLE_RATE_LIMIT is set
-  if (process.env.DISABLE_RATE_LIMIT === 'true') {
-    return ((req: Request, res: Response, next: NextFunction) => next()) as RateLimitRequestHandler;
+const createRedisClient = async () => {
+  const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+
+  const client = createClient({
+    url: redisUrl,
+  });
+
+  client.on('error', (err) => {
+    logger.error('Rate Limit Redis Client Error:', err);
+  });
+
+  await client.connect();
+  return client;
+};
+
+/**
+ * Rate limiter configurations
+ * NOTE: These limits are quite permissive for development.
+ * For production, consider much stricter limits:
+ * - Authentication: 3-5 attempts per 15 minutes
+ * - General API: 60-100 requests per minute
+ * - Message sending: 10-20 messages per minute
+ */
+
+// Create rate limiters with fallback to memory store
+export const createRateLimiter = (options: any = {}) => {
+  // Skip rate limiting in tests
+  if (process.env.NODE_ENV === 'test') {
+    return (req: Request, res: Response, next: NextFunction) => next();
   }
 
-  const defaultOptions: Partial<Options> = {
+  const defaultOptions = {
     windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests
+    max: 100, // Quite permissive for development
     message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req: Request, res: Response) => {
       res.status(429).json({
         success: false,
-        error: options.message || 'Too many requests, please try again later.'
+        error: options.message || 'Too many requests, please try again later.',
       });
     },
-    keyGenerator: (req: Request) => {
-      // Use user ID for authenticated users, IP for guests
-      const reqWithUser = req as Request & { body?: { user?: { id?: string } } };
-      if (reqWithUser.body?.user?.id) {
-        return reqWithUser.body.user.id;
-      }
-      // Handle proxy IPs
-      const forwarded = req.headers['x-forwarded-for'];
-      if (forwarded) {
-        return (forwarded as string).split(',')[0].trim();
-      }
-      return req.ip || 'unknown';
-    },
-    store: new RedisStore({
-      client: redisClient,
-      prefix: 'rate_limit:'
-    } as any)
   };
 
+  // Try to use Redis store, fallback to memory if Redis is not available
+  if (process.env.NODE_ENV === 'production' || process.env.USE_REDIS === 'true') {
+    return (async () => {
+      try {
+        const client = await createRedisClient();
+        return rateLimit({
+          ...defaultOptions,
+          ...options,
+          store: new RedisStore({
+            // @ts-ignore - Redis v4 client works with rate-limit-redis
+            client: client,
+            prefix: 'rl:',
+          }),
+        });
+      } catch (error) {
+        logger.warn('Redis not available for rate limiting, using memory store:', error);
+        return rateLimit({ ...defaultOptions, ...options });
+      }
+    })();
+  }
+
+  // Default to memory store for development
   return rateLimit({ ...defaultOptions, ...options });
 };
 
-/**
- * Rate Limiting Configuration
- *
- * All rate limiters provide the following headers in response:
- * - X-RateLimit-Limit: Maximum number of requests
- * - X-RateLimit-Remaining: Number of requests remaining
- * - X-RateLimit-Reset: Time when the limit resets (Unix timestamp)
- */
+// Pre-configured limiters for different endpoints
+// NOTE: These are development-friendly limits. Tighten for production!
 
-// General rate limiter - 100 requests per minute per IP
-export const generalLimiter = createRateLimiter();
-
-/**
- * Auth rate limiter - stricter for registration endpoints
- * Limit: 5 attempts per 15 minutes per IP
- */
-export const authRateLimiter = createRateLimiter({
+export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: 'Too many authentication attempts, please try again later.'
+  max: 10, // 10 attempts per window (production: reduce to 3-5)
+  message: 'Too many authentication attempts, please try again later.',
+  skipSuccessfulRequests: false,
 });
 
-/**
- * Login rate limiter - very strict to prevent brute force
- * Limit: 3 attempts per 15 minutes per IP
- */
-export const loginRateLimiter = createRateLimiter({
+export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // Limit each IP to 3 login requests per windowMs
+  max: 5, // 5 attempts per window (production: reduce to 3)
   message: 'Too many login attempts, please try again later.',
-  skipSuccessfulRequests: true
+  skipSuccessfulRequests: true, // Don't count successful logins
 });
 
-/**
- * API rate limiter - for authenticated users
- * Limit: 200 requests per minute per user ID
- */
-export const apiLimiter = createRateLimiter({
+export const generalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 200, // Higher limit for authenticated users
-  message: 'API rate limit exceeded, please slow down your requests.'
+  max: 100, // 100 requests per minute (production: consider 60)
+  message: 'Too many requests, please try again later.',
 });
-
-/**
- * Message sending rate limiter
- * Limit: 30 messages per minute per user
- * Prevents spam and abuse of messaging system
- */
-export const messageLimiter = createRateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 messages per minute
-  message: 'Message rate limit exceeded. Maximum 30 messages per minute.'
-});
-
-// Aliases for backward compatibility
-export const authLimiter = authRateLimiter;
-export const loginLimiter = loginRateLimiter;

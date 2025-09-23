@@ -1,0 +1,665 @@
+openapi: 3.0.3
+info:
+  title: Messaging App API
+  description: |
+    A scalable, secure messaging application with end-to-end encryption and real-time delivery.
+
+    ## Features
+    - JWT-based authentication
+    - End-to-end RSA encryption
+    - Real-time message delivery via WebSocket
+    - Message status tracking (sent/delivered/read)
+    - Idempotent message ingestion
+    - Pagination support
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@messaging-app.com
+
+servers:
+  - url: http://localhost
+    description: Development server (via Nginx Gateway)
+  - url: https://api.messaging-app.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User registration and login
+  - name: Users
+    description: User profile management
+  - name: Messages
+    description: Message sending and retrieval
+  - name: Chats
+    description: Chat management
+  - name: Health
+    description: Service health checks
+  - name: WebSocket
+    description: Real-time events (see separate documentation)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        username:
+          type: string
+          example: "john_doe"
+        publicKey:
+          type: string
+          description: RSA public key for message encryption
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        senderId:
+          type: string
+          format: uuid
+        receiverId:
+          type: string
+          format: uuid
+        encryptedText:
+          type: string
+          description: Base64 encoded encrypted message content
+        status:
+          type: string
+          enum: [sent, delivered, read]
+        timestamp:
+          type: string
+          format: date-time
+
+    Chat:
+      type: object
+      properties:
+        chatId:
+          type: string
+          description: Unique identifier for the chat (user1-user2)
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+        lastMessage:
+          $ref: '#/components/schemas/Message'
+        unreadCount:
+          type: integer
+          minimum: 0
+
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error message"
+
+    Success:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: The requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitError:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ValidationError:
+      description: Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Creates a new user account with RSA public key for E2E encryption
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - publicKey
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-zA-Z0-9_]+$"
+                  example: "john_doe"
+                password:
+                  type: string
+                  minLength: 8
+                  description: Must contain uppercase, lowercase, number, and special character
+                  example: "SecurePass123!"
+                publicKey:
+                  type: string
+                  description: RSA public key in PEM format
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticates user and returns JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "john_doe"
+                password:
+                  type: string
+                  example: "SecurePass123!"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /users/{username}:
+    get:
+      tags:
+        - Users
+      summary: Get user by username
+      description: Retrieves user profile information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username of the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /users/{username}/public-key:
+    get:
+      tags:
+        - Users
+      summary: Get user's public key
+      description: Retrieves the RSA public key for message encryption
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public key retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      publicKey:
+                        type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /messages:
+    post:
+      tags:
+        - Messages
+      summary: Send a message
+      description: Sends an encrypted message to another user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - receiverUsername
+                - encryptedText
+                - clientMessageId
+              properties:
+                receiverUsername:
+                  type: string
+                  example: "jane_doe"
+                encryptedText:
+                  type: string
+                  description: Base64 encoded encrypted message
+                clientMessageId:
+                  type: string
+                  description: Client-generated unique ID for idempotency
+                  example: "client-msg-123"
+      responses:
+        '201':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Message'
+        '200':
+          description: Duplicate message (idempotent response)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Receiver not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /messages/{id}/status:
+    patch:
+      tags:
+        - Messages
+      summary: Update message status
+      description: Updates the status of a message (delivered/read)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [delivered, read]
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /chats:
+    get:
+      tags:
+        - Chats
+      summary: List all chats
+      description: Retrieves all chats for the authenticated user with pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Number of chats to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of chats to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Chats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chat'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /chats/{chatId}/messages:
+    get:
+      tags:
+        - Chats
+      summary: Get messages in a chat
+      description: Retrieves all messages in a specific chat with pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          description: Chat identifier (user1-user2)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Not authorized to view this chat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health/{service}:
+    get:
+      tags:
+        - Health
+      summary: Check service health
+      description: Returns health status of a specific service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [auth, users, messaging, realtime]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  service:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  dependencies:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [connected, disconnected]
+                      redis:
+                        type: string
+                        enum: [connected, disconnected]
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "unhealthy"
+                  service:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+# WebSocket Events Documentation
+x-websocket-events:
+  connect:
+    description: Establish WebSocket connection
+    authentication: JWT token in auth object
+    example: |
+      const socket = io('http://localhost', {
+        auth: { token: 'jwt-token' }
+      });
+
+  new_message:
+    type: incoming
+    description: Receive new message in real-time
+    payload:
+      $ref: '#/components/schemas/Message'
+
+  message_status:
+    type: incoming
+    description: Receive message status updates
+    payload:
+      type: object
+      properties:
+        messageId:
+          type: string
+        status:
+          type: string
+          enum: [delivered, read]
+
+  user_typing:
+    type: incoming
+    description: Receive typing indicator
+    payload:
+      type: object
+      properties:
+        userId:
+          type: string
+        typing:
+          type: boolean
+
+  mark_delivered:
+    type: outgoing
+    description: Mark messages as delivered
+    payload:
+      type: array
+      items:
+        type: string
+        description: Message IDs
+
+  mark_read:
+    type: outgoing
+    description: Mark messages as read
+    payload:
+      type: array
+      items:
+        type: string
+        description: Message IDs
+
+  typing_start:
+    type: outgoing
+    description: Send typing start indicator
+    payload:
+      type: object
+      properties:
+        receiverId:
+          type: string
+
+  typing_stop:
+    type: outgoing
+    description: Send typing stop indicator
+    payload:
+      type: object
+      properties:
+        receiverId:
+          type: string

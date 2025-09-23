@@ -1,11 +1,7 @@
 import { prisma } from '../config/database';
 import { redisClient } from '../config/redis';
-import {
-  Chat,
-  Message,
-  PaginationParams
-} from '../types';
-import { MessageStatus } from '@prisma/client';
+import { Chat, Message, MessageStatus, PaginationParams } from '../types';
+import { normalizeMessage } from '../utils/message';
 
 export const chatService = {
   async listUserChats(userId: string, pagination: PaginationParams): Promise<Chat[]> {
@@ -63,7 +59,7 @@ export const chatService = {
         lastMessage: row.last_message,
         unreadCount: Number(row.unread_count),
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
     });
 
@@ -82,25 +78,27 @@ export const chatService = {
     const cached = await redisClient.get(cacheKey);
 
     if (cached) {
-      return JSON.parse(cached);
+      return JSON.parse(cached) as Message[];
     }
 
     const messages = await prisma.message.findMany({
       where: {
         OR: [
           { senderId: user1, receiverId: user2 },
-          { senderId: user2, receiverId: user1 }
-        ]
+          { senderId: user2, receiverId: user1 },
+        ],
       },
       orderBy: { timestamp: 'desc' },
       skip: offset,
-      take: limit
+      take: limit,
     });
 
-    // Cache for 1 minute
-    await redisClient.setEx(cacheKey, 60, JSON.stringify(messages));
+    const normalizedMessages = messages.map((msg) => normalizeMessage(msg));
 
-    return messages;
+    // Cache for 1 minute
+    await redisClient.setEx(cacheKey, 60, JSON.stringify(normalizedMessages));
+
+    return normalizedMessages;
   },
 
   async getChatUnreadCount(userId: string, partnerId: string): Promise<number> {
@@ -108,8 +106,8 @@ export const chatService = {
       where: {
         senderId: partnerId,
         receiverId: userId,
-        status: { not: MessageStatus.read }
-      }
+        status: { not: MessageStatus.read },
+      },
     });
 
     return count;
@@ -122,6 +120,5 @@ export const chatService = {
     if (keys.length > 0) {
       await redisClient.del(keys);
     }
-  }
+  },
 };
-

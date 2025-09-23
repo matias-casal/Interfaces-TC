@@ -37,12 +37,21 @@ RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# Copy start script
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
+
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R nodejs:nodejs /app/logs && \
+    chown nodejs:nodejs ./start.sh
 
 USER nodejs
 
 EXPOSE 3001
 
-CMD ["npm", "start"]
+ENTRYPOINT ["sh", "./start.sh"]

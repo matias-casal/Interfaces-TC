@@ -9,11 +9,16 @@ import { chatRouter } from './routes/chats';
 import { healthRouter } from './routes/health';
 import { redisClient } from './config/redis';
 import { prisma } from './config/database';
+import { logger } from './utils/logger';
+import { startRealtimeSubscriber, stopRealtimeSubscriber } from './workers/realtimeSubscriber';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3003;
+
+// Trust proxy - required for X-Forwarded headers from Nginx
+app.set('trust proxy', true);
 
 // Middleware
 app.use(helmet());
@@ -31,9 +36,11 @@ app.use(errorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
-  console.log('Shutting down gracefully...');
+  logger.info('Shutting down gracefully...');
   await prisma.$disconnect();
+  await stopRealtimeSubscriber();
   await redisClient.quit();
+  logger.info('Shutdown complete');
   process.exit(0);
 };
 
@@ -45,17 +52,23 @@ const startServer = async () => {
   try {
     // Connect to Redis
     await redisClient.connect();
-    console.log('Connected to Redis');
+    logger.info('Connected to Redis');
+
+    await startRealtimeSubscriber();
+    logger.info('Real-time subscriber ready');
 
     // Test database connection
     await prisma.$connect();
-    console.log('Connected to PostgreSQL');
+    logger.info('Connected to PostgreSQL');
 
     app.listen(PORT, () => {
-      console.log(`Messaging service running on port ${PORT}`);
+      logger.info(`Messaging service running on port ${PORT}`, {
+        environment: process.env.NODE_ENV,
+        port: PORT,
+      });
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 };

@@ -1,11 +1,19 @@
 import type { Server, Socket } from 'socket.io';
 import { redisClient } from '../config/redis';
 import { MessageStatus } from '../types';
+import { logger } from '../utils/logger';
 
+/**
+ * Setup WebSocket event handlers for real-time communication
+ * @param io - Socket.io server instance
+ * @description Manages user connections, message delivery notifications,
+ *              typing indicators, and pending message delivery.
+ *              Implements Redis-based user presence tracking.
+ */
 export function setupSocketHandlers(io: Server) {
   io.on('connection', async (socket: Socket) => {
     const userId = socket.data.user.id;
-    console.log(`User ${userId} connected`);
+    logger.info(`User ${userId} connected`);
 
     // Join user's personal room
     await socket.join(`user:${userId}`);
@@ -16,17 +24,28 @@ export function setupSocketHandlers(io: Server) {
     // Handle marking messages as delivered
     socket.on('mark_delivered', async (messageIds: string[]) => {
       try {
+        if (!Array.isArray(messageIds) || messageIds.length === 0) {
+          socket.emit('error', { message: 'messageIds are required' });
+          return;
+        }
+
+        const ids = Array.from(new Set(messageIds.filter((id) => typeof id === 'string' && id.length > 0)));
+        if (ids.length === 0) {
+          socket.emit('error', { message: 'messageIds are required' });
+          return;
+        }
+
         // Publish delivery confirmation
         await redisClient.publish(
           'message_delivery',
           JSON.stringify({
             userId,
-            messageIds,
-            status: MessageStatus.DELIVERED
+            messageIds: ids,
+            status: MessageStatus.DELIVERED,
           })
         );
 
-        socket.emit('delivery_confirmed', { messageIds });
+        socket.emit('delivery_confirmed', { messageIds: ids });
       } catch (error) {
         socket.emit('error', { message: 'Failed to mark messages as delivered' });
       }
@@ -35,17 +54,28 @@ export function setupSocketHandlers(io: Server) {
     // Handle marking messages as read
     socket.on('mark_read', async (messageIds: string[]) => {
       try {
+        if (!Array.isArray(messageIds) || messageIds.length === 0) {
+          socket.emit('error', { message: 'messageIds are required' });
+          return;
+        }
+
+        const ids = Array.from(new Set(messageIds.filter((id) => typeof id === 'string' && id.length > 0)));
+        if (ids.length === 0) {
+          socket.emit('error', { message: 'messageIds are required' });
+          return;
+        }
+
         // Publish read receipt
         await redisClient.publish(
           'message_read',
           JSON.stringify({
             userId,
-            messageIds,
-            status: MessageStatus.READ
+            messageIds: ids,
+            status: MessageStatus.READ,
           })
         );
 
-        socket.emit('read_confirmed', { messageIds });
+        socket.emit('read_confirmed', { messageIds: ids });
       } catch (error) {
         socket.emit('error', { message: 'Failed to mark messages as read' });
       }
@@ -54,41 +84,35 @@ export function setupSocketHandlers(io: Server) {
     // Handle typing indicators
     socket.on('typing_start', async (data: { receiverId: string }) => {
       const receiverId = data.receiverId || data;
-      console.log(`User ${userId} started typing to ${receiverId}`);
+      logger.debug(`User ${userId} started typing to ${receiverId}`);
 
       // Emit to receiver's room
       io.to(`user:${receiverId}`).emit('user_typing', {
         userId,
-        typing: true
+        typing: true,
       });
 
       // Also publish to Redis for other instances
-      await redisClient.publish(
-        `typing:${receiverId}`,
-        JSON.stringify({ userId, typing: true })
-      );
+      await redisClient.publish(`typing:${receiverId}`, JSON.stringify({ userId, typing: true }));
     });
 
     socket.on('typing_stop', async (data: { receiverId: string }) => {
       const receiverId = data.receiverId || data;
-      console.log(`User ${userId} stopped typing to ${receiverId}`);
+      logger.debug(`User ${userId} stopped typing to ${receiverId}`);
 
       // Emit to receiver's room
       io.to(`user:${receiverId}`).emit('user_typing', {
         userId,
-        typing: false
+        typing: false,
       });
 
       // Also publish to Redis for other instances
-      await redisClient.publish(
-        `typing:${receiverId}`,
-        JSON.stringify({ userId, typing: false })
-      );
+      await redisClient.publish(`typing:${receiverId}`, JSON.stringify({ userId, typing: false }));
     });
 
     // Handle disconnect
     socket.on('disconnect', async () => {
-      console.log(`User ${userId} disconnected`);
+      logger.info(`User ${userId} disconnected`);
 
       // Mark user as offline
       await redisClient.del(`user:online:${userId}`);

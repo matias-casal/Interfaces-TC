@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Messaging App - API Documentation</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+        .swagger-ui .topbar {
+            display: none;
+        }
+        .swagger-ui .info {
+            margin-bottom: 40px;
+        }
+        .websocket-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+        }
+        .websocket-section h2 {
+            color: #3b4151;
+            margin-top: 0;
+        }
+        .websocket-event {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #61affe;
+        }
+        .websocket-event.outgoing {
+            border-left-color: #49cc90;
+        }
+        .websocket-event h3 {
+            margin: 0 0 10px 0;
+            color: #3b4151;
+        }
+        .event-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .event-type.incoming {
+            background: #61affe;
+            color: white;
+        }
+        .event-type.outgoing {
+            background: #49cc90;
+            color: white;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+
+    <div class="websocket-section">
+        <h2>🔌 WebSocket Events Documentation</h2>
+        <p>The real-time service uses Socket.io for WebSocket communication. Connect to <code>http://localhost</code> with your JWT token.</p>
+
+        <h3>Connection Example:</h3>
+        <pre><code>const socket = io('http://localhost', {
+  auth: {
+    token: 'your-jwt-token'
+  },
+  transports: ['websocket', 'polling']
+});</code></pre>
+
+        <div class="websocket-event">
+            <h3>new_message <span class="event-type incoming">INCOMING</span></h3>
+            <p>Receive new message in real-time when someone sends you a message.</p>
+            <pre><code>socket.on('new_message', (message) => {
+  console.log('New message:', message);
+  // message: { id, senderId, receiverId, encryptedText, status, timestamp }
+});</code></pre>
+        </div>
+
+        <div class="websocket-event">
+            <h3>message_status <span class="event-type incoming">INCOMING</span></h3>
+            <p>Receive updates when your sent messages are delivered or read.</p>
+            <pre><code>socket.on('message_status', (status) => {
+  console.log('Status update:', status);
+  // status: { messageId, status: 'delivered' | 'read' }
+});</code></pre>
+        </div>
+
+        <div class="websocket-event">
+            <h3>user_typing <span class="event-type incoming">INCOMING</span></h3>
+            <p>Receive typing indicators from other users.</p>
+            <pre><code>socket.on('user_typing', (data) => {
+  console.log('Typing:', data);
+  // data: { userId, typing: true | false }
+});</code></pre>
+        </div>
+
+        <div class="websocket-event outgoing">
+            <h3>mark_delivered <span class="event-type outgoing">OUTGOING</span></h3>
+            <p>Mark messages as delivered when you receive them.</p>
+            <pre><code>socket.emit('mark_delivered', ['messageId1', 'messageId2']);</code></pre>
+        </div>
+
+        <div class="websocket-event outgoing">
+            <h3>mark_read <span class="event-type outgoing">OUTGOING</span></h3>
+            <p>Mark messages as read when user views them.</p>
+            <pre><code>socket.emit('mark_read', ['messageId1', 'messageId2']);</code></pre>
+        </div>
+
+        <div class="websocket-event outgoing">
+            <h3>typing_start / typing_stop <span class="event-type outgoing">OUTGOING</span></h3>
+            <p>Send typing indicators to other users.</p>
+            <pre><code>// Start typing
+socket.emit('typing_start', { receiverId: 'user-123' });
+
+// Stop typing
+socket.emit('typing_stop', { receiverId: 'user-123' });</code></pre>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "./openapi.yaml",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                docExpansion: "list",
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                displayRequestDuration: true,
+                tryItOutEnabled: true,
+                syntaxHighlight: {
+                    activate: true,
+                    theme: "agate"
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 
 import { redisClient } from '../config/redis';
+import { logger } from '../utils/logger';
 import type { JWTPayload } from '../types';
 import { JWTUtils } from '../utils/jwt';
 
@@ -12,7 +13,11 @@ declare global {
   }
 }
 
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const authMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
@@ -40,7 +45,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       }
     } catch (redisError) {
       // Continue even if Redis fails, let JWT validation handle it
-      console.error('Redis error during blacklist check:', redisError);
+      logger.error('Redis error during blacklist check:', redisError);
     }
 
     try {

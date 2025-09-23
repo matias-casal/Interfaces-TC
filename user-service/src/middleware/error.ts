@@ -23,7 +23,7 @@ export const errorHandler = (
     res.status(400).json({
       success: false,
       error: 'Validation error',
-      details: err.errors
+      details: err.errors,
     });
     return;
   }
@@ -31,7 +31,7 @@ export const errorHandler = (
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       success: false,
-      error: err.message
+      error: err.message,
     });
     return;
   }
@@ -39,7 +39,7 @@ export const errorHandler = (
   console.error('Unexpected error:', err);
   res.status(500).json({
     success: false,
-    error: 'Internal server error'
+    error: 'Internal server error',
   });
 };
 

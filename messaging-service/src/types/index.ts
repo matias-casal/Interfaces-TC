@@ -1,8 +1,8 @@
-// Import types from Prisma
-import { MessageStatus as PrismaMessageStatus, Message as PrismaMessage } from '@prisma/client';
-
-// Re-export Prisma types
-export { MessageStatus } from '@prisma/client';
+export enum MessageStatus {
+  sent = 'sent',
+  delivered = 'delivered',
+  read = 'read',
+}
 
 export interface User {
   id: string;
@@ -13,8 +13,17 @@ export interface User {
   updatedAt: Date;
 }
 
-// Use Prisma's Message type directly
-export type Message = PrismaMessage;
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  encryptedText: string;
+  status: MessageStatus;
+  clientMessageId: string;
+  timestamp: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface Chat {
   chatId: string;
@@ -69,5 +78,5 @@ export interface SendMessageRequest {
 }
 
 export interface UpdateMessageStatusRequest {
-  status: PrismaMessageStatus;
+  status: MessageStatus;
 }

@@ -43,12 +43,21 @@ RUN npx prisma generate
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
+# Copy start script
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
+
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && \
+    chown -R nodejs:nodejs /app/logs && \
+    chown nodejs:nodejs ./start.sh
 
 USER nodejs
 
 EXPOSE 3002
 
-CMD ["npm", "start"]
+ENTRYPOINT ["sh", "./start.sh"]

@@ -11,7 +11,7 @@ export const userController = {
 
     const response: ApiResponse<Omit<User, 'password'>[]> = {
       success: true,
-      data: users
+      data: users,
     };
 
     res.json(response);
@@ -32,7 +32,7 @@ export const userController = {
 
     const response: ApiResponse<Omit<User, 'password'>> = {
       success: true,
-      data: user
+      data: user,
     };
 
     res.json(response);
@@ -53,9 +53,9 @@ export const userController = {
 
     const response: ApiResponse<{ publicKey: string }> = {
       success: true,
-      data: { publicKey }
+      data: { publicKey },
     };
 
     res.json(response);
-  }
+  },
 };
