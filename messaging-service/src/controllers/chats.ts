@@ -1,11 +1,7 @@
 import { Request, Response } from 'express';
 import { chatService } from '../services/chats';
 import { paginationSchema } from '../validators';
-import {
-  ApiResponse,
-  Chat,
-  Message
-} from '../types';
+import { ApiResponse, Chat, Message } from '../types';
 import { AppError } from '../middleware/error';
 
 export const chatController = {
@@ -14,7 +10,7 @@ export const chatController = {
     const pagination = paginationSchema.parse({
       limit: req.query.limit,
       offset: req.query.offset,
-      cursor: req.query.cursor
+      cursor: req.query.cursor,
     });
     const userId = req.user!.id;
 
@@ -22,7 +18,7 @@ export const chatController = {
 
     const response: ApiResponse<Chat[]> = {
       success: true,
-      data: chats
+      data: chats,
     };
 
     res.json(response);
@@ -34,7 +30,7 @@ export const chatController = {
     const pagination = paginationSchema.parse({
       limit: req.query.limit,
       offset: req.query.offset,
-      cursor: req.query.cursor
+      cursor: req.query.cursor,
     });
     const userId = req.user!.id;
 
@@ -72,17 +68,13 @@ export const chatController = {
       throw new AppError('Unauthorized to view this chat', 403);
     }
 
-    const messages = await chatService.getChatMessages(
-      user1,
-      user2,
-      pagination
-    );
+    const messages = await chatService.getChatMessages(user1, user2, pagination);
 
     const response: ApiResponse<Message[]> = {
       success: true,
-      data: messages
+      data: messages,
     };
 
     res.json(response);
-  }
+  },
 };

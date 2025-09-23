@@ -1,7 +1,13 @@
 import rateLimit from 'express-rate-limit';
 
 /**
- * Rate Limiting Configuration
+ * Rate Limiting Configuration for User Service
+ *
+ * NOTE: Current limits are permissive for development/testing.
+ * For production, consider stricter limits:
+ * - User queries: 30-60 per minute
+ * - Profile operations: 10-20 per minute
+ * - Authentication: 3-5 attempts per 15 minutes
  *
  * All rate limiters provide the following headers in response:
  * - X-RateLimit-Limit: Maximum number of requests

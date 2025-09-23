@@ -1,7 +1,7 @@
 export enum MessageStatus {
   SENT = 'sent',
   DELIVERED = 'delivered',
-  READ = 'read'
+  READ = 'read',
 }
 
 export interface User {

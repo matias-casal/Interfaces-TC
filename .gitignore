@@ -1,8 +1,11 @@
 # Dependencies
 node_modules/
+node_modules 2/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.npm/
 
 # Production build
 dist/
@@ -40,3 +43,11 @@ dump.rdb
 # Temporary files
 tmp/
 temp/
+*.tmp
+*.bak
+*.old
+
+# Test files in root
+test_*.json
+*_test.json
+*_token.txt

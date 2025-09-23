@@ -8,11 +8,15 @@ import { userRouter } from './routes/users';
 import { healthRouter } from './routes/health';
 import { redisClient } from './config/redis';
 import { prisma } from './config/database';
+import { logger, loggerHelper } from './utils/logger';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+
+// Trust proxy - required for X-Forwarded headers from Nginx
+app.set('trust proxy', true);
 
 // Middleware
 app.use(helmet());
@@ -29,7 +33,7 @@ app.use(errorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
-  console.log('Shutting down gracefully...');
+  loggerHelper.logShutdown('SIGTERM/SIGINT received');
   await prisma.$disconnect();
   await redisClient.quit();
   process.exit(0);
@@ -43,17 +47,17 @@ const startServer = async () => {
   try {
     // Connect to Redis
     await redisClient.connect();
-    console.log('Connected to Redis');
+    logger.info('Connected to Redis');
 
     // Test database connection
     await prisma.$connect();
-    console.log('Connected to PostgreSQL');
+    logger.info('Connected to PostgreSQL');
 
     app.listen(PORT, () => {
-      console.log(`User service running on port ${PORT}`);
+      loggerHelper.logStartup(Number(PORT));
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 };

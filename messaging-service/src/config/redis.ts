@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import { logger } from '../utils/logger';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -6,12 +7,20 @@ export const redisClient = createClient({
   url: redisUrl,
 });
 
+export const redisSubscriber = createClient({
+  url: redisUrl,
+});
+
 redisClient.on('error', (err) => {
-  console.error('Redis Client Error:', err);
+  logger.error('Redis Client Error:', err);
 });
 
 redisClient.on('connect', () => {
-  console.log('Redis Client Connected');
+  logger.info('Redis Client Connected');
+});
+
+redisSubscriber.on('error', (err) => {
+  logger.error('Redis Subscriber Error:', err);
 });
 
 // Helper function for pub/sub

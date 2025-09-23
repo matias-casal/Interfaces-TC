@@ -12,7 +12,7 @@ export class JWTUtils {
 
   static sign(payload: JWTPayload): string {
     const expiresIn = process.env.JWT_EXPIRE_TIME || '7d';
-    return jwt.sign(payload, this.getSecret(), { expiresIn });
+    return jwt.sign(payload, this.getSecret(), { expiresIn } as jwt.SignOptions);
   }
 
   static verify(token: string): JWTPayload {

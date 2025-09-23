@@ -1,5 +1,6 @@
 import { createClient } from 'redis';
 import { Server } from 'socket.io';
+import { logger } from '../utils/logger';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -12,11 +13,11 @@ export const redisSubscriber = createClient({
 });
 
 redisClient.on('error', (err) => {
-  console.error('Redis Client Error:', err);
+  logger.error('Redis Client Error:', err);
 });
 
 redisSubscriber.on('error', (err) => {
-  console.error('Redis Subscriber Error:', err);
+  logger.error('Redis Subscriber Error:', err);
 });
 
 export async function subscribeToChannels(io: Server) {
@@ -31,7 +32,7 @@ export async function subscribeToChannels(io: Server) {
       // Emit to user's room
       io.to(`user:${userId}`).emit('new_message', data);
     } catch (error) {
-      console.error('Error processing message:', error);
+      logger.error('Error processing message:', error);
     }
   });
 
@@ -44,9 +45,9 @@ export async function subscribeToChannels(io: Server) {
       // Emit status update to user's room
       io.to(`user:${userId}`).emit('message_status', data);
     } catch (error) {
-      console.error('Error processing status update:', error);
+      logger.error('Error processing status update:', error);
     }
   });
 
-  console.log('Redis subscriber connected and listening');
+  logger.info('Redis subscriber connected and listening');
 }

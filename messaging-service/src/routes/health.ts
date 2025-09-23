@@ -18,14 +18,14 @@ healthRouter.get('/', async (_req, res) => {
       timestamp: new Date().toISOString(),
       dependencies: {
         database: 'connected',
-        redis: redisPing === 'PONG' ? 'connected' : 'disconnected'
-      }
+        redis: redisPing === 'PONG' ? 'connected' : 'disconnected',
+      },
     });
   } catch (error) {
     res.status(503).json({
       status: 'unhealthy',
       service: 'messaging-service',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

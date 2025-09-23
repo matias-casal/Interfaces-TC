@@ -69,6 +69,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +96,7 @@ services:
       REALTIME_SERVICE_URL: ${REALTIME_SERVICE_URL}
       RATE_LIMIT_MESSAGE_MAX_PER_MIN: ${RATE_LIMIT_MESSAGE_MAX_PER_MIN:-30}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy

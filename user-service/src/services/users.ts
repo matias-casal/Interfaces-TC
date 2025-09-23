@@ -12,13 +12,13 @@ export const userService = {
         username: true,
         publicKey: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
       },
       skip: offset,
       take: limit,
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     return users;
@@ -40,8 +40,8 @@ export const userService = {
         username: true,
         publicKey: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     if (user) {
@@ -63,7 +63,7 @@ export const userService = {
 
     const user = await prisma.user.findUnique({
       where: { username },
-      select: { publicKey: true }
+      select: { publicKey: true },
     });
 
     if (user) {
@@ -91,8 +91,8 @@ export const userService = {
         username: true,
         publicKey: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     if (user) {
@@ -105,10 +105,7 @@ export const userService = {
 
   async clearUserCache(username: string, userId?: string): Promise<void> {
     // Clear all cache entries for a user
-    const cacheKeys = [
-      `user:profile:${username}`,
-      `publicKey:${username}`
-    ];
+    const cacheKeys = [`user:profile:${username}`, `publicKey:${username}`];
 
     if (userId) {
       cacheKeys.push(`user:id:${userId}`);
@@ -134,8 +131,8 @@ export const userService = {
         username: true,
         publicKey: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     if (user) {
@@ -148,5 +145,5 @@ export const userService = {
     }
 
     return user;
-  }
+  },
 };

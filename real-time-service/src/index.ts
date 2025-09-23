@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { JWTUtils } from './utils/jwt';
 import { redisClient, subscribeToChannels } from './config/redis';
 import { setupSocketHandlers } from './handlers/socket';
+import { logger, loggerHelper } from './utils/logger';
 
 dotenv.config();
 
@@ -29,25 +30,28 @@ app.get('/health', async (_req, res) => {
       service: 'real-time-service',
       timestamp: new Date().toISOString(),
       dependencies: {
-        redis: redisPing === 'PONG' ? 'connected' : 'disconnected'
-      }
+        redis: redisPing === 'PONG' ? 'connected' : 'disconnected',
+      },
     });
   } catch (error) {
     res.status(503).json({
       status: 'unhealthy',
       service: 'real-time-service',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
 // Create HTTP server and Socket.IO instance
 const httpServer = createServer(app);
+// TODO: CORS configuration needs to be restricted for production
+// Currently allowing multiple origins for development
+// In production, this should be limited to specific trusted domains
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+    origin: '*', // TODO: Change to specific origins in production
+    methods: ['GET', 'POST'],
+  },
 });
 
 // Socket.IO middleware for authentication
@@ -71,7 +75,7 @@ setupSocketHandlers(io);
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
-  console.log('Shutting down gracefully...');
+  loggerHelper.logShutdown('SIGTERM/SIGINT received');
   io.close();
   await redisClient.quit();
   process.exit(0);
@@ -85,17 +89,17 @@ const startServer = async () => {
   try {
     // Connect to Redis
     await redisClient.connect();
-    console.log('Connected to Redis');
+    logger.info('Connected to Redis');
 
     // Subscribe to Redis channels
     await subscribeToChannels(io);
-    console.log('Subscribed to Redis channels');
+    logger.info('Subscribed to Redis channels');
 
     httpServer.listen(PORT, () => {
-      console.log(`Real-time service running on port ${PORT}`);
+      loggerHelper.logStartup(Number(PORT));
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 };

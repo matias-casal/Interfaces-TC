@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  watchman: false,
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.spec.ts'],
   transform: {
@@ -11,7 +12,7 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/**/__tests__/**',
     '!src/index.ts',
-    '!src/config/*.ts'
+    '!src/config/*.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -20,10 +21,10 @@ module.exports = {
   testTimeout: 10000,
   coverageThreshold: {
     global: {
-      branches: 0,
-      functions: 15,
-      lines: 10,
-      statements: 10
-    }
-  }
+      branches: 10,  // Realistic threshold based on current tests
+      functions: 20, // Service layer has good test coverage
+      lines: 15,     // Current test suite covers core functionality
+      statements: 15, // Will improve with additional test development
+    },
+  },
 };

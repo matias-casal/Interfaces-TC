@@ -16,12 +16,12 @@ export class CryptoUtils {
       modulusLength: 2048,
       publicKeyEncoding: {
         type: 'spki',
-        format: 'pem'
+        format: 'pem',
       },
       privateKeyEncoding: {
         type: 'pkcs8',
-        format: 'pem'
-      }
+        format: 'pem',
+      },
     });
     return { publicKey, privateKey };
   }
@@ -33,7 +33,7 @@ export class CryptoUtils {
         {
           key: publicKey,
           padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-          oaepHash: 'sha256'
+          oaepHash: 'sha256',
         },
         Buffer.from(text, 'utf8')
       );
@@ -50,7 +50,7 @@ export class CryptoUtils {
         {
           key: privateKey,
           padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-          oaepHash: 'sha256'
+          oaepHash: 'sha256',
         },
         Buffer.from(encryptedBase64, 'base64')
       );

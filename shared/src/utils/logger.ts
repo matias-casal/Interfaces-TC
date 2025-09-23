@@ -14,17 +14,6 @@ interface LoggerConfig {
   logDir?: string;
 }
 
-// Request metadata interface
-interface RequestMeta {
-  requestId?: string;
-  userId?: string;
-  method?: string;
-  url?: string;
-  ip?: string;
-  userAgent?: string;
-  duration?: number;
-  statusCode?: number;
-}
 
 // Custom log format with consistent structure
 const customFormat = winston.format.printf(({ level, message, timestamp, service, ...meta }) => {
@@ -40,7 +29,7 @@ export function createLogger(config: LoggerConfig): winston.Logger {
     logLevel = environment === 'production' ? 'info' : 'debug',
     enableConsole = true,
     enableFile = environment === 'production',
-    logDir = 'logs'
+    logDir = 'logs',
   } = config;
 
   const transports: winston.transport[] = [];
@@ -49,10 +38,7 @@ export function createLogger(config: LoggerConfig): winston.Logger {
   if (enableConsole) {
     transports.push(
       new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.simple()
-        )
+        format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
       })
     );
   }
@@ -67,7 +53,7 @@ export function createLogger(config: LoggerConfig): winston.Logger {
         level: 'error',
         maxSize: '20m',
         maxFiles: '14d',
-        zippedArchive: true
+        zippedArchive: true,
       })
     );
 
@@ -78,7 +64,7 @@ export function createLogger(config: LoggerConfig): winston.Logger {
         datePattern: 'YYYY-MM-DD',
         maxSize: '20m',
         maxFiles: '14d',
-        zippedArchive: true
+        zippedArchive: true,
       })
     );
   }
@@ -94,13 +80,17 @@ export function createLogger(config: LoggerConfig): winston.Logger {
     ),
     defaultMeta: { service, environment },
     transports,
-    exitOnError: false
+    exitOnError: false,
   });
 }
 
 // Express request logger middleware
 export function createRequestLogger(logger: winston.Logger) {
-  return (req: Request & { requestId?: string; userId?: string; user?: any }, res: any, next: any) => {
+  return (
+    req: Request & { requestId?: string; userId?: string; user?: any },
+    res: any,
+    next: any
+  ) => {
     const startTime = Date.now();
     const requestId = uuidv4();
 
@@ -114,12 +104,12 @@ export function createRequestLogger(logger: winston.Logger) {
       url: req.url,
       ip: req.ip || req.connection.remoteAddress,
       userAgent: req.get('user-agent'),
-      userId: req.userId || req.user?.id
+      userId: req.userId || req.user?.id,
     });
 
     // Log response
     const originalSend = res.send;
-    res.send = function(data: any) {
+    res.send = function (data: any) {
       const duration = Date.now() - startTime;
 
       logger.info('Request completed', {
@@ -128,7 +118,7 @@ export function createRequestLogger(logger: winston.Logger) {
         url: req.url,
         statusCode: res.statusCode,
         duration,
-        userId: req.userId || req.user?.id
+        userId: req.userId || req.user?.id,
       });
 
       // Log error responses
@@ -139,7 +129,7 @@ export function createRequestLogger(logger: winston.Logger) {
           url: req.url,
           statusCode: res.statusCode,
           error: data,
-          userId: req.userId || req.user?.id
+          userId: req.userId || req.user?.id,
         });
       }
 
@@ -150,7 +140,7 @@ export function createRequestLogger(logger: winston.Logger) {
           method: req.method,
           url: req.url,
           duration,
-          userId: req.userId || req.user?.id
+          userId: req.userId || req.user?.id,
         });
       }
 
@@ -174,7 +164,7 @@ export class LoggerHelper {
     this.logger.info(`Service started on port ${port}`, {
       event: 'service_start',
       port,
-      ...additionalInfo
+      ...additionalInfo,
     });
   }
 
@@ -182,18 +172,24 @@ export class LoggerHelper {
   logShutdown(reason?: string) {
     this.logger.info('Service shutting down', {
       event: 'service_shutdown',
-      reason
+      reason,
     });
   }
 
   // Log database operations
-  logDatabaseOperation(operation: string, table: string, duration: number, success: boolean, error?: any) {
+  logDatabaseOperation(
+    operation: string,
+    table: string,
+    duration: number,
+    success: boolean,
+    error?: any
+  ) {
     const logData = {
       event: 'database_operation',
       operation,
       table,
       duration,
-      success
+      success,
     };
 
     if (success) {
@@ -201,7 +197,7 @@ export class LoggerHelper {
     } else {
       this.logger.error(`Database operation failed: ${operation} on ${table}`, {
         ...logData,
-        error: error?.message || error
+        error: error?.message || error,
       });
     }
   }
@@ -213,19 +209,25 @@ export class LoggerHelper {
       operation,
       key,
       hit,
-      duration
+      duration,
     });
   }
 
   // Log external API calls
-  logApiCall(service: string, endpoint: string, method: string, statusCode: number, duration: number) {
+  logApiCall(
+    service: string,
+    endpoint: string,
+    method: string,
+    statusCode: number,
+    duration: number
+  ) {
     const logData = {
       event: 'external_api_call',
       service,
       endpoint,
       method,
       statusCode,
-      duration
+      duration,
     };
 
     if (statusCode < 400) {
@@ -236,12 +238,17 @@ export class LoggerHelper {
   }
 
   // Log authentication events
-  logAuth(event: 'login' | 'logout' | 'register' | 'token_refresh', userId: string, success: boolean, metadata?: any) {
+  logAuth(
+    event: 'login' | 'logout' | 'register' | 'token_refresh',
+    userId: string,
+    success: boolean,
+    metadata?: any
+  ) {
     const logData = {
       event: `auth_${event}`,
       userId,
       success,
-      ...metadata
+      ...metadata,
     };
 
     if (success) {
@@ -252,21 +259,30 @@ export class LoggerHelper {
   }
 
   // Log message operations
-  logMessage(event: 'sent' | 'delivered' | 'read' | 'encrypted' | 'decrypted', messageId: string, metadata?: any) {
+  logMessage(
+    event: 'sent' | 'delivered' | 'read' | 'encrypted' | 'decrypted',
+    messageId: string,
+    metadata?: any
+  ) {
     this.logger.info(`Message ${event}`, {
       event: `message_${event}`,
       messageId,
-      ...metadata
+      ...metadata,
     });
   }
 
   // Log WebSocket events
-  logWebSocket(event: 'connection' | 'disconnect' | 'message' | 'error', socketId: string, userId?: string, metadata?: any) {
+  logWebSocket(
+    event: 'connection' | 'disconnect' | 'message' | 'error',
+    socketId: string,
+    userId?: string,
+    metadata?: any
+  ) {
     const logData = {
       event: `websocket_${event}`,
       socketId,
       userId,
-      ...metadata
+      ...metadata,
     };
 
     if (event === 'error') {
@@ -282,7 +298,7 @@ export class LoggerHelper {
       this.logger.warn('Rate limit exceeded', {
         event: 'rate_limit_exceeded',
         userId,
-        endpoint
+        endpoint,
       });
     }
   }
@@ -294,7 +310,7 @@ export class LoggerHelper {
       metric,
       value,
       unit,
-      ...metadata
+      ...metadata,
     });
   }
 
@@ -303,7 +319,7 @@ export class LoggerHelper {
     const logData = {
       event: `security_${event}`,
       severity,
-      ...details
+      ...details,
     };
 
     switch (severity) {
@@ -321,13 +337,16 @@ export class LoggerHelper {
 }
 
 // Export a function to create consistent logger across all services
-export function initializeLogger(serviceName: string): { logger: winston.Logger; loggerHelper: LoggerHelper } {
+export function initializeLogger(serviceName: string): {
+  logger: winston.Logger;
+  loggerHelper: LoggerHelper;
+} {
   const logger = createLogger({
     service: serviceName,
     environment: process.env.NODE_ENV,
     logLevel: process.env.LOG_LEVEL,
     enableFile: process.env.NODE_ENV === 'production',
-    logDir: process.env.LOG_DIR || 'logs'
+    logDir: process.env.LOG_DIR || 'logs',
   });
 
   const loggerHelper = new LoggerHelper(logger);
@@ -340,7 +359,7 @@ export function setupGracefulShutdown(logger: winston.Logger, serviceName: strin
   const shutdown = (signal: string) => {
     logger.info(`${serviceName} received ${signal} signal, starting graceful shutdown`, {
       event: 'graceful_shutdown',
-      signal
+      signal,
     });
 
     // Give winston time to flush logs
@@ -355,7 +374,7 @@ export function setupGracefulShutdown(logger: winston.Logger, serviceName: strin
     logger.error('Uncaught exception', {
       event: 'uncaught_exception',
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     shutdown('uncaughtException');
   });
@@ -363,7 +382,7 @@ export function setupGracefulShutdown(logger: winston.Logger, serviceName: strin
     logger.error('Unhandled rejection', {
       event: 'unhandled_rejection',
       reason,
-      promise
+      promise,
     });
     shutdown('unhandledRejection');
   });

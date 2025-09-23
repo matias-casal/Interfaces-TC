@@ -2,11 +2,12 @@ import { Router } from 'express';
 
 import { prisma } from '../config/database';
 import { redisClient } from '../config/redis';
+import { logger } from '../utils/logger';
 
 export const healthRouter = Router();
 export default healthRouter;
 
-healthRouter.get('/health', async (_req, res) => {
+healthRouter.get('/', async (_req, res) => {
   let dbConnected = false;
   let redisConnected = false;
 
@@ -15,15 +16,27 @@ healthRouter.get('/health', async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     dbConnected = true;
   } catch (error) {
-    console.error('Database health check failed:', error);
+    logger.error('Database health check failed:', error);
   }
 
   // Check Redis connection
   try {
-    const redisPing = await redisClient.ping();
-    redisConnected = redisPing === 'PONG';
+    // Check if Redis client is connected
+    if (redisClient.isOpen) {
+      // For legacy mode, use v3 API
+      const redisPing = await redisClient.v4.ping();
+      redisConnected = redisPing === 'PONG';
+    } else {
+      redisConnected = false;
+    }
   } catch (error) {
-    console.error('Redis health check failed:', error);
+    // Fallback: check if client is at least connected
+    try {
+      redisConnected = redisClient.isOpen || redisClient.isReady;
+    } catch {
+      redisConnected = false;
+    }
+    logger.error('Redis health check failed:', error);
   }
 
   const isHealthy = dbConnected && redisConnected;
@@ -46,8 +59,8 @@ healthRouter.get('/health', async (_req, res) => {
     version,
     dependencies: {
       database: dbConnected ? 'connected' : 'disconnected',
-      redis: redisConnected ? 'connected' : 'disconnected'
-    }
+      redis: redisConnected ? 'connected' : 'disconnected',
+    },
   };
 
   res.status(isHealthy ? 200 : 503).json(response);

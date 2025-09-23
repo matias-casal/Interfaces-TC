@@ -18,9 +18,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : authHeader;
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
 
     const decoded = JWTUtils.verify(token);
     req.user = decoded;

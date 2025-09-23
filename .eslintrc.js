@@ -6,10 +6,7 @@ module.exports = {
     sourceType: 'module',
   },
   plugins: ['@typescript-eslint'],
-  extends: [
-    'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-  ],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
   env: {
     node: true,
     es2022: true,
@@ -40,5 +37,11 @@ module.exports = {
     'no-dupe-keys': 'error',
     'no-dupe-args': 'error',
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js', '*.d.ts', 'coverage/', '__tests__/', '*.test.ts', '*.spec.ts'],
+  ignorePatterns: [
+    'dist/',
+    'node_modules/',
+    '*.js',
+    '*.d.ts',
+    'coverage/',
+  ],
 };

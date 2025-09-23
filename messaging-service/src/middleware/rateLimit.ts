@@ -3,6 +3,12 @@ import rateLimit from 'express-rate-limit';
 /**
  * Rate Limiting Configuration
  *
+ * NOTE: Current limits are permissive for development/testing.
+ * For production, consider much stricter limits:
+ * - Authentication: 3 attempts per 15 minutes
+ * - Messages: 10-20 per minute
+ * - General API: 60 requests per minute
+ *
  * All rate limiters provide the following headers in response:
  * - X-RateLimit-Limit: Maximum number of requests
  * - X-RateLimit-Remaining: Number of requests remaining

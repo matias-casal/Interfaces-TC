@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  watchman: false,
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.spec.ts'],
   transform: {
@@ -11,7 +12,7 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/**/__tests__/**',
     '!src/index.ts',
-    '!src/config/*.ts'
+    '!src/config/*.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -23,7 +24,7 @@ module.exports = {
       branches: 60,
       functions: 60,
       lines: 60,
-      statements: 60
-    }
-  }
+      statements: 60,
+    },
+  },
 };

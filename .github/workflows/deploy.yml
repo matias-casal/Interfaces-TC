@@ -1,0 +1,143 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+
+env:
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  test:
+    name: Run Tests Before Deploy
+    uses: ./.github/workflows/ci.yml
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Build and push Auth Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./auth-service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/messaging-auth:latest
+          ${{ secrets.DOCKER_USERNAME }}/messaging-auth:${{ steps.version.outputs.VERSION }}
+
+    - name: Build and push User Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./user-service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/messaging-user:latest
+          ${{ secrets.DOCKER_USERNAME }}/messaging-user:${{ steps.version.outputs.VERSION }}
+
+    - name: Build and push Messaging Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./messaging-service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/messaging-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/messaging-service:${{ steps.version.outputs.VERSION }}
+
+    - name: Build and push Real-time Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./real-time-service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/messaging-realtime:latest
+          ${{ secrets.DOCKER_USERNAME }}/messaging-realtime:${{ steps.version.outputs.VERSION }}
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > ${HOME}/.kube/config
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/configmap.yaml
+        kubectl apply -f k8s/secrets.yaml
+        kubectl apply -f k8s/postgres.yaml
+        kubectl apply -f k8s/redis.yaml
+        kubectl apply -f k8s/auth-service.yaml
+        kubectl apply -f k8s/user-service.yaml
+        kubectl apply -f k8s/messaging-service.yaml
+        kubectl apply -f k8s/realtime-service.yaml
+        kubectl apply -f k8s/ingress.yaml
+
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/auth-service -n messaging-app
+        kubectl rollout status deployment/user-service -n messaging-app
+        kubectl rollout status deployment/messaging-service -n messaging-app
+        kubectl rollout status deployment/realtime-service -n messaging-app
+
+    - name: Run smoke tests
+      run: |
+        # Wait for services to be ready
+        sleep 30
+        # Run basic health checks
+        kubectl exec -it deployment/auth-service -n messaging-app -- curl http://localhost:3001/health
+        kubectl exec -it deployment/user-service -n messaging-app -- curl http://localhost:3002/health
+        kubectl exec -it deployment/messaging-service -n messaging-app -- curl http://localhost:3003/health
+        kubectl exec -it deployment/realtime-service -n messaging-app -- curl http://localhost:3004/health
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+    - name: Send Slack notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          Deployment ${{ job.status }}
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()
