@@ -1,0 +1,58 @@
+{
+  "name": "messaging-app",
+  "version": "1.0.0",
+  "description": "Microservices-based messaging application",
+  "private": true,
+  "workspaces": [
+    "auth-service",
+    "user-service",
+    "messaging-service",
+    "real-time-service",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "dev:stop": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "prod": "docker-compose up --build",
+    "prod:stop": "docker-compose down",
+    "start": "docker-compose up",
+    "stop": "docker-compose down",
+    "clean": "docker-compose down -v",
+    "test": "npm run test --workspaces",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:integration": "node test-integration.js",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "prettier --write '**/*.{ts,tsx,js,jsx,json,md}'",
+    "build": "npm run build --workspaces",
+    "build:docker": "docker-compose build",
+    "prod:up": "docker-compose -f docker-compose.prod.yml up -d",
+    "prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push",
+    "prisma:migrate": "npx prisma migrate deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "eslint-config-airbnb-typescript": "^17.1.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "express-rate-limit": "^8.1.0",
+    "rate-limit-redis": "^4.2.2",
+    "socket.io-client": "^4.8.1",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  }
+}
