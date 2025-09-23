@@ -1,0 +1,157 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: messaging-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - messaging-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: messaging-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - messaging-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${AUTH_SERVICE_PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_TIME: ${JWT_EXPIRE_TIME:-7d}
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - messaging-network
+    command: npm start
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${USER_SERVICE_PORT:-3002}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - messaging-network
+    command: npm start
+
+  messaging-service:
+    build:
+      context: ./messaging-service
+      dockerfile: Dockerfile
+    container_name: messaging-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${MESSAGING_SERVICE_PORT:-3003}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      REALTIME_SERVICE_URL: ${REALTIME_SERVICE_URL}
+      RATE_LIMIT_MESSAGE_MAX_PER_MIN: ${RATE_LIMIT_MESSAGE_MAX_PER_MIN:-30}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - messaging-network
+    command: npm start
+
+  real-time-service:
+    build:
+      context: ./real-time-service
+      dockerfile: Dockerfile
+    container_name: real-time-service
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${REALTIME_SERVICE_PORT:-3004}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - messaging-network
+    command: npm start
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: messaging-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+      - user-service
+      - messaging-service
+      - real-time-service
+    networks:
+      - messaging-network
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx-logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  messaging-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  nginx-logs:
